@@ -7,7 +7,7 @@
   color: white;
 }
 
-.landingPageContainer nav {
+.landingPageContainer nav  {
   padding-inline: 1.2rem;
   padding-block: 1.6rem;
   display: flex;
@@ -15,10 +15,10 @@
   align-items: center;
 
 }
-
-.landingPageContainer nav h2 {
-  font-size: 1.8rem;
-  font-weight: 500;
+ .navHeader img {
+    width: 15vw;
+    height: auto;
+    object-fit: contain;
 }
 
 .landingPageContainer nav .navlist {
@@ -66,6 +66,11 @@
   padding-inline: 20px;
   text-align: center;
 
+}
+.navBar img {
+    width: 15vw;
+    height: auto;
+    object-fit: contain;
 }
 .meetContainer {
   display: flex;

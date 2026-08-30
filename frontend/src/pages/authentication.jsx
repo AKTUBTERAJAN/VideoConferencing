@@ -17,6 +17,9 @@ import { Snackbar } from '@mui/material';
 
 
 
+//Random image 
+const randomImage = `https://picsum.photos/1200/800?random=${Date.now()}`;
+
 // TODO remove, this demo shouldn't need to reset the theme.
 
 const defaultTheme = createTheme();
@@ -25,11 +28,12 @@ export default function Authentication() {
 
     
 
-    const [username, setUsername] = React.useState();
-    const [password, setPassword] = React.useState();
-    const [name, setName] = React.useState();
-    const [error, setError] = React.useState();
-    const [message, setMessage] = React.useState();
+    const [username, setUsername] = React.useState("");
+    const [email, setEmail] = React.useState("");
+    const [password, setPassword] = React.useState("");
+    const [name, setName] = React.useState("");
+    const [error, setError] = React.useState("");
+    const [message, setMessage] = React.useState("");
 
 
     const [formState, setFormState] = React.useState(0);
@@ -48,9 +52,11 @@ export default function Authentication() {
 
             }
             if (formState === 1) {
-                let result = await handleRegister(name, username, password);
+                let result = await handleRegister(name, username, email, password);
                 console.log(result);
                 setUsername("");
+                setEmail("");
+                setName("");
                 setMessage(result);
                 setOpen(true);
                 setError("")
@@ -60,7 +66,7 @@ export default function Authentication() {
         } catch (err) {
 
             console.log(err);
-            let message = (err.response.data.message);
+            let message = (err?.response?.data?.message || "An error occurred");
             setError(message);
         }
     }
@@ -76,10 +82,12 @@ export default function Authentication() {
                     sm={4}
                     md={7}
                     sx={{
-                        backgroundImage: 'url(https://source.unsplash.com/random?wallpapers)',
+                        backgroundImage: `url(${randomImage})`,
                         backgroundRepeat: 'no-repeat',
                         backgroundColor: (t) =>
-                            t.palette.mode === 'light' ? t.palette.grey[50] : t.palette.grey[900],
+                            t.palette.mode === 'light'
+                                ? t.palette.grey[50]
+                                : t.palette.grey[900],
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                     }}
@@ -100,10 +108,10 @@ export default function Authentication() {
 
 
                         <div>
-                            <Button variant={formState === 0 ? "contained" : ""} onClick={() => { setFormState(0) }}>
+                            <Button variant={formState === 0 ? "contained" : ""} onClick={() => { setFormState(0); setError(""); }}>
                                 Sign In
                             </Button>
-                            <Button variant={formState === 1 ? "contained" : ""} onClick={() => { setFormState(1) }}>
+                            <Button variant={formState === 1 ? "contained" : ""} onClick={() => { setFormState(1); setError(""); }}>
                                 Sign Up
                             </Button>
                         </div>
@@ -113,9 +121,9 @@ export default function Authentication() {
                                 margin="normal"
                                 required
                                 fullWidth
-                                id="username"
+                                id="name"
                                 label="Full Name"
-                                name="username"
+                                name="name"
                                 value={name}
                                 autoFocus
                                 onChange={(e) => setName(e.target.value)}
@@ -126,13 +134,26 @@ export default function Authentication() {
                                 required
                                 fullWidth
                                 id="username"
-                                label="Username"
+                                label={formState === 0 ? "Username or Email" : "Username"}
                                 name="username"
                                 value={username}
-                                autoFocus
+                                autoFocus={formState === 0}
                                 onChange={(e) => setUsername(e.target.value)}
 
                             />
+
+                            {formState === 1 ? <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                id="email"
+                                label="Email Address"
+                                name="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                            /> : <></>}
+
                             <TextField
                                 margin="normal"
                                 required

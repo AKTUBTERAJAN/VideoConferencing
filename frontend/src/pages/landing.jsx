@@ -10,7 +10,7 @@ export default function LandingPage() {
         <div className='landingPageContainer'>
             <nav>
                 <div className='navHeader'>
-                    <h2>Apna Video Call</h2>
+                    <img src="/Meetora.png" alt="" />
                 </div>
                 <div className='navlist'>
                     <p onClick={() => {
