@@ -1,6 +1,6 @@
 import axios from "axios";
 import httpStatus from "http-status";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import server from "../environment";
 
@@ -14,13 +14,32 @@ const client = axios.create({
 
 export const AuthProvider = ({ children }) => {
 
-    const authContext = useContext(AuthContext);
-
-
-    const [userData, setUserData] = useState(authContext);
-
+    const [userData, setUserData] = useState(null);
 
     const router = useNavigate();
+
+    const getUserProfile = async () => {
+        const token = localStorage.getItem("token");
+        if (!token) return null;
+        try {
+            let request = await client.get("/get_user_profile", {
+                params: { token }
+            });
+            if (request.status === httpStatus.OK) {
+                setUserData(request.data);
+                return request.data;
+            }
+        } catch (err) {
+            console.error("Error fetching user profile:", err);
+        }
+    }
+
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token && !userData) {
+            getUserProfile();
+        }
+    }, []);
 
     const handleRegister = async (name, username, email, password) => {
         try {
@@ -30,7 +49,6 @@ export const AuthProvider = ({ children }) => {
                 email: email,
                 password: password
             })
-
 
             if (request.status === httpStatus.CREATED) {
                 return request.data.message;
@@ -47,12 +65,14 @@ export const AuthProvider = ({ children }) => {
                 password: password
             });
 
-            console.log(username, password)
-            console.log(request.data)
-
             if (request.status === httpStatus.OK) {
                 localStorage.setItem("token", request.data.token);
-                router("/home")
+                if (request.data.user) {
+                    setUserData(request.data.user);
+                } else {
+                    await getUserProfile();
+                }
+                router("/home");
             }
         } catch (err) {
             throw err;
@@ -67,8 +87,7 @@ export const AuthProvider = ({ children }) => {
                 }
             });
             return request.data
-        } catch
-         (err) {
+        } catch (err) {
             throw err;
         }
     }
@@ -87,7 +106,7 @@ export const AuthProvider = ({ children }) => {
 
 
     const data = {
-        userData, setUserData, addToUserHistory, getHistoryOfUser, handleRegister, handleLogin
+        userData, setUserData, addToUserHistory, getHistoryOfUser, handleRegister, handleLogin, getUserProfile
     }
 
     return (

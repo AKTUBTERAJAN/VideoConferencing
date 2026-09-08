@@ -22,7 +22,15 @@ const login = async (req, res) => {
             let token = crypto.randomBytes(64).toString('hex');
             user.token = token;
             await user.save();
-            return res.status(httpStatus.OK).json({ message: "Login successful", token });
+            return res.status(httpStatus.OK).json({
+                message: "Login successful",
+                token,
+                user: {
+                    name: user.name,
+                    username: user.username,
+                    email: user.email
+                }
+            });
         } else {
             return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid credentials" });
         }
@@ -56,6 +64,26 @@ const register = async (req, res) => {
 
         await newUser.save();
         return res.status(httpStatus.CREATED).json({ message: "User registered successfully" });
+    } catch (e) {
+        return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ message: `Something went wrong: ${e.message || e}` });
+    }
+}
+
+const getUserProfile = async (req, res) => {
+    const token = req.query.token || req.headers.authorization;
+    if (!token) {
+        return res.status(httpStatus.BAD_REQUEST).json({ message: "Token is required" });
+    }
+    try {
+        const user = await User.findOne({ token: token });
+        if (!user) {
+            return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
+        }
+        return res.status(httpStatus.OK).json({
+            name: user.name,
+            username: user.username,
+            email: user.email
+        });
     } catch (e) {
         return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ message: `Something went wrong: ${e.message || e}` });
     }
@@ -95,4 +123,4 @@ const addToHistory = async (req, res) => {
     }
 }
 
-export { login, register, getUserHistory, addToHistory };
+export { login, register, getUserProfile, getUserHistory, addToHistory };
