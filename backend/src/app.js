@@ -25,6 +25,11 @@ app.use(express.urlencoded({ limit: "50kb", extended: true }));
 
 app.use("/api/v1/users", userRoutes);
 
+// Home route
+app.get("/", (req, res) => {
+    res.send("Video Conferencing Server is Running!");
+});
+
 const start = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URI);
