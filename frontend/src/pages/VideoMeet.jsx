@@ -121,6 +121,86 @@ export default function VideoMeetComponent() {
 
     useEffect(() => {
         getPermissions();
+
+        // Pre-connect socket during lobby (WebSocket only = skip long-polling upgrade)
+        socketRef.current = io.connect(server_url, { transports: ['websocket'] });
+        socketRef.current.on('signal', gotMessageFromServer);
+        socketRef.current.on('connect', () => {
+            socketIdRef.current = socketRef.current.id;
+        });
+
+        socketRef.current.on('chat-message', addMessage);
+
+        socketRef.current.on('user-left', (id) => {
+            setVideos((prevVideos) => {
+                const filtered = prevVideos.filter((v) => v.socketId !== id);
+                videoRef.current = filtered;
+                return filtered;
+            });
+        });
+
+        socketRef.current.on('user-joined', (id, clients, userNamesMap) => {
+            clients.forEach((socketListId) => {
+                connections[socketListId] = new RTCPeerConnection(peerConfigConnections);
+
+                connections[socketListId].onicecandidate = function (event) {
+                    if (event.candidate != null) {
+                        socketRef.current.emit('signal', socketListId, JSON.stringify({ 'ice': event.candidate }));
+                    }
+                };
+
+                connections[socketListId].onaddstream = (event) => {
+                    let videoExists = videoRef.current.find(v => v.socketId === socketListId);
+                    const displayName = (userNamesMap && userNamesMap[socketListId]) ? userNamesMap[socketListId] : `User ${socketListId.slice(0, 4)}`;
+
+                    if (videoExists) {
+                        setVideos(prevVideos => {
+                            const updated = prevVideos.map(v =>
+                                v.socketId === socketListId ? { ...v, stream: event.stream, username: displayName } : v
+                            );
+                            videoRef.current = updated;
+                            return updated;
+                        });
+                    } else {
+                        let newVideo = {
+                            socketId: socketListId,
+                            stream: event.stream,
+                            autoplay: true,
+                            playsinline: true,
+                            username: displayName
+                        };
+
+                        setVideos(prevVideos => {
+                            const updated = [...prevVideos, newVideo];
+                            videoRef.current = updated;
+                            return updated;
+                        });
+                    }
+                };
+
+                if (window.localStream) {
+                    connections[socketListId].addStream(window.localStream);
+                }
+            });
+
+            if (id === socketIdRef.current) {
+                for (let id2 in connections) {
+                    if (id2 === socketIdRef.current) continue;
+                    try {
+                        connections[id2].addStream(window.localStream);
+                    } catch (e) { }
+
+                    connections[id2].createOffer().then((description) => {
+                        connections[id2].setLocalDescription(description)
+                            .then(() => {
+                                socketRef.current.emit('signal', id2, JSON.stringify({ 'sdp': connections[id2].localDescription }));
+                            })
+                            .catch(e => console.log(e));
+                    });
+                }
+            }
+        });
+
         return () => {
             // Hardware Camera & Microphone Release on unmount (Back button / navigation)
             if (window.localStream) {
@@ -301,86 +381,8 @@ export default function VideoMeetComponent() {
     };
 
     let connectToSocketServer = () => {
-        socketRef.current = io.connect(server_url, { secure: false });
-
-        socketRef.current.on('signal', gotMessageFromServer);
-
-        socketRef.current.on('connect', () => {
-            socketRef.current.emit('join-call', window.location.pathname, username);
-            socketIdRef.current = socketRef.current.id;
-
-            socketRef.current.on('chat-message', addMessage);
-
-            socketRef.current.on('user-left', (id) => {
-                setVideos((prevVideos) => {
-                    const filtered = prevVideos.filter((v) => v.socketId !== id);
-                    videoRef.current = filtered;
-                    return filtered;
-                });
-            });
-
-            socketRef.current.on('user-joined', (id, clients, userNamesMap) => {
-                clients.forEach((socketListId) => {
-                    connections[socketListId] = new RTCPeerConnection(peerConfigConnections);
-                    
-                    connections[socketListId].onicecandidate = function (event) {
-                        if (event.candidate != null) {
-                            socketRef.current.emit('signal', socketListId, JSON.stringify({ 'ice': event.candidate }));
-                        }
-                    };
-
-                    connections[socketListId].onaddstream = (event) => {
-                        let videoExists = videoRef.current.find(v => v.socketId === socketListId);
-                        const displayName = (userNamesMap && userNamesMap[socketListId]) ? userNamesMap[socketListId] : `User ${socketListId.slice(0, 4)}`;
-
-                        if (videoExists) {
-                            setVideos(prevVideos => {
-                                const updated = prevVideos.map(v =>
-                                    v.socketId === socketListId ? { ...v, stream: event.stream, username: displayName } : v
-                                );
-                                videoRef.current = updated;
-                                return updated;
-                            });
-                        } else {
-                            let newVideo = {
-                                socketId: socketListId,
-                                stream: event.stream,
-                                autoplay: true,
-                                playsinline: true,
-                                username: displayName
-                            };
-
-                            setVideos(prevVideos => {
-                                const updated = [...prevVideos, newVideo];
-                                videoRef.current = updated;
-                                return updated;
-                            });
-                        }
-                    };
-
-                    if (window.localStream) {
-                        connections[socketListId].addStream(window.localStream);
-                    }
-                });
-
-                if (id === socketIdRef.current) {
-                    for (let id2 in connections) {
-                        if (id2 === socketIdRef.current) continue;
-                        try {
-                            connections[id2].addStream(window.localStream);
-                        } catch (e) { }
-
-                        connections[id2].createOffer().then((description) => {
-                            connections[id2].setLocalDescription(description)
-                                .then(() => {
-                                    socketRef.current.emit('signal', id2, JSON.stringify({ 'sdp': connections[id2].localDescription }));
-                                })
-                                .catch(e => console.log(e));
-                        });
-                    }
-                }
-            });
-        });
+        // Socket already pre-connected on mount, just join the room
+        socketRef.current.emit('join-call', window.location.pathname, username);
     };
 
     let handleVideo = () => {
