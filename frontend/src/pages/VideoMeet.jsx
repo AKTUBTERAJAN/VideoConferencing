@@ -119,6 +119,40 @@ export default function VideoMeetComponent() {
     const analysersMapRef = useRef({});
     const lastSpeakerTimeRef = useRef(0);
 
+    // Defined before mount useEffect so they're accessible during socket setup
+    const gotMessageFromServer = (fromId, message) => {
+        var signal = JSON.parse(message);
+
+        if (fromId !== socketIdRef.current) {
+            if (signal.sdp) {
+                connections[fromId].setRemoteDescription(new RTCSessionDescription(signal.sdp)).then(() => {
+                    if (signal.sdp.type === 'offer') {
+                        connections[fromId].createAnswer().then((description) => {
+                            connections[fromId].setLocalDescription(description).then(() => {
+                                socketRef.current.emit('signal', fromId, JSON.stringify({ 'sdp': connections[fromId].localDescription }));
+                            }).catch(e => console.log(e));
+                        }).catch(e => console.log(e));
+                    }
+                }).catch(e => console.log(e));
+            }
+
+            if (signal.ice) {
+                connections[fromId].addIceCandidate(new RTCIceCandidate(signal.ice)).catch(e => console.log(e));
+            }
+        }
+    };
+
+    const addMessage = (data, sender, socketIdSender) => {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setMessages((prevMessages) => [
+            ...prevMessages,
+            { sender: sender, data: data, time: timeStr, socketIdSender: socketIdSender }
+        ]);
+        if (socketIdSender !== socketIdRef.current) {
+            setNewMessages((prevNewMessages) => prevNewMessages + 1);
+        }
+    };
+
     useEffect(() => {
         getPermissions();
 
@@ -358,27 +392,6 @@ export default function VideoMeetComponent() {
         }
     };
 
-    let gotMessageFromServer = (fromId, message) => {
-        var signal = JSON.parse(message);
-
-        if (fromId !== socketIdRef.current) {
-            if (signal.sdp) {
-                connections[fromId].setRemoteDescription(new RTCSessionDescription(signal.sdp)).then(() => {
-                    if (signal.sdp.type === 'offer') {
-                        connections[fromId].createAnswer().then((description) => {
-                            connections[fromId].setLocalDescription(description).then(() => {
-                                socketRef.current.emit('signal', fromId, JSON.stringify({ 'sdp': connections[fromId].localDescription }));
-                            }).catch(e => console.log(e));
-                        }).catch(e => console.log(e));
-                    }
-                }).catch(e => console.log(e));
-            }
-
-            if (signal.ice) {
-                connections[fromId].addIceCandidate(new RTCIceCandidate(signal.ice)).catch(e => console.log(e));
-            }
-        }
-    };
 
     let connectToSocketServer = () => {
         // Socket already pre-connected on mount, just join the room
@@ -450,17 +463,6 @@ export default function VideoMeetComponent() {
         window.location.href = "/";
     }
 };
-
-    const addMessage = (data, sender, socketIdSender) => {
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setMessages((prevMessages) => [
-            ...prevMessages,
-            { sender: sender, data: data, time: timeStr, socketIdSender: socketIdSender }
-        ]);
-        if (socketIdSender !== socketIdRef.current) {
-            setNewMessages((prevNewMessages) => prevNewMessages + 1);
-        }
-    };
 
     let sendMessage = () => {
         if (!message.trim()) return;
